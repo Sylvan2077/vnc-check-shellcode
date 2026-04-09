@@ -787,10 +787,20 @@ run_vnc_check() {
       logInfo "正在调用 VNC 会话服务 API 创建桌面..."
       local api_url="http://0.0.0.0:8000/vnc/start_session"
       
-      # 检查脚本是否存在
+      # 检查run_glx脚本是否存在
       if [ ! -f /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh ]; then
-          logError "脚本 /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh 不存在，退出"
-          exit 1
+          logError "脚本 /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh 不存在，创建"
+          cat > /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh << 'EOF'
+#!/bin/bash
+export OPENBOX_DIR = /opt/scns_apps_platform/thirdparty/OpenBox
+export VIRTUALGL_DIR = /opt/scns_apps_platform/thirdparty/VirtualGL
+export XDG_DATA_DIRS = $OPENBOX_DIR/share:/usr/share
+export XDG_CONFIG_DIRS = $OPENBOX_DIR/etc/xdg:/etc/xdg
+$OPENBOX_DIR/bin/openbox --session & PID=$!
+$VIRTUALGL_DIR/bin/vglrun /opt/scns_apps_platform/thirdparty/VirtualGL/bin/glxspheres64
+kill $PID
+EOF
+      chmod +x /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh
       fi
       
       local api_payload='{"username":"caep_user1","display_number":1,"custom_script_path":"/opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh"}'
