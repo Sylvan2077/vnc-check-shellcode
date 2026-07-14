@@ -1,0 +1,1 @@
+websokify -D --web /path/to/noVnc 6080 --token-plugin TokenFileName --token-source /home/user/novnc

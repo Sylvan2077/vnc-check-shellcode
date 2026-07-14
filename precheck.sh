@@ -108,7 +108,7 @@ service_of_port() {
     10086) echo "平台后端 API 服务（Gunicorn 托管 Django 应用 vncmanagementdb）" ;;
     8088)  echo "Filebrowser 文件服务（filebrowser 二进制，提供共享目录访问）" ;;
     8000)  echo "VNC Session 管理服务（Session Manager, FastAPI应用）" ;;
-    9000) echo "User Management 用户管理服务（User Management，FastAPI应用）" ;;
+    28080) echo "SymTalk/协同服务（SYMTALK_PORT；脚本未启动但建议预留）" ;;
     *)
       echo "（未定义/动态端口）"
       ;;
@@ -124,7 +124,7 @@ print_fixed_port_map() {
   log_info "  10086 -> $(service_of_port 10086)"
   log_info "   8088 -> $(service_of_port 8088)"
   log_info "   8000 -> $(service_of_port 8000)"
-  log_info "   9000 -> $(service_of_port 9000)" 
+  log_info "  28080 -> $(service_of_port 28080)"
   log_info "  5801-5899 -> VNC Web/HTTP 端口段（noVNC/浏览器访问常用）"
   log_info "  5901-5999 -> VNC TCP 端口段（VNC Viewer/桌面连接常用）"
 }
@@ -270,7 +270,7 @@ DEPLOY_SCRIPTS_DIR="${PROJECT_DIR}/deploy-scripts"
 
 INIT_ENV="${DEPLOY_SCRIPTS_DIR}/init_env.sh"
 COMMON_SH="${DEPLOY_SCRIPTS_DIR}/common.sh"
-DEPLOY_THIRDPARTY="${DEPLOY_SCRIPTS_DIR}/deploy-thirtparty.sh"
+DEPLOY_THIRDPARTY="${DEPLOY_SCRIPTS_DIR}/deploy-thirdparty.sh"
 DEPLOY_PLATFORM="${DEPLOY_SCRIPTS_DIR}/deploy-platform.sh"
 
 log_info "PROJECT_DIR = ${PROJECT_DIR}"
@@ -408,7 +408,7 @@ P_FRONT="${FRONT_PORT:-8086}"
 P_BACKEND="${VNCMANAGEMENT_PORT:-10086}"
 P_FILEB="${FILEBROWSER_PORT:-8088}"
 P_SESSION_MGR="${VNC_SESSION_MGR_PORT:-8000}"
-P_USER_MGMT="${USER_MANAGEMENT_PORT:-9000}"
+P_SYM="${SYMTALK_PORT:-28080}"
 
 if [[ -s "$LISTENERS_TSV" ]]; then
   check_port_free_with_details "$P_PG" "$LISTENERS_TSV"  "$(service_of_port "$P_PG")"
@@ -417,7 +417,6 @@ if [[ -s "$LISTENERS_TSV" ]]; then
   check_port_free_with_details "$P_BACKEND" "$LISTENERS_TSV" "$(service_of_port "$P_BACKEND")"
   check_port_free_with_details "$P_FILEB" "$LISTENERS_TSV" "$(service_of_port "$P_FILEB")"
   check_port_free_with_details "$P_SESSION_MGR" "$LISTENERS_TSV" "$(service_of_port "$P_SESSION_MGR")"
-  check_port_free_with_details "$P_USER_MGMT" "$LISTENERS_TSV" "$(service_of_port "$P_USER_MGMT")"
 #   check_port_free_with_details "$P_SYM" "$LISTENERS_TSV" "$(service_of_port "$P_SYM")"
 
   # VNC 端口范围：明确告知两段范围是否占用，并列出占用明细

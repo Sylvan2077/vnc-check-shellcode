@@ -79,7 +79,7 @@ print_stage_header() {
     printf "\n${LIGHT_BLUE}========== %s ==========${NOCOLOR}\n" "$title"
 }
 
-  # 检查用户是否存在，不存在则创建
+# 检查用户是否存在，不存在则创建
 _check_and_create_user() {
   local username="$1"
   if ! id -u "$username" >/dev/null 2>&1; then
@@ -787,21 +787,24 @@ run_vnc_check() {
       logInfo "正在调用 VNC 会话服务 API 创建桌面..."
       local api_url="http://0.0.0.0:8000/vnc/start_session"
       
-      # 检查run_glx脚本是否存在
+      # 检查run_glx脚本是否存在，不存在则创建默认内容
       if [ ! -f /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh ]; then
-          logError "脚本 /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh 不存在，创建"
+          logInfo "glxspheres64 启动脚本不存在，创建默认配置"
           cat > /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh << 'EOF'
 #!/bin/bash
-export OPENBOX_DIR = /opt/scns_apps_platform/thirdparty/OpenBox
-export VIRTUALGL_DIR = /opt/scns_apps_platform/thirdparty/VirtualGL
-export XDG_DATA_DIRS = $OPENBOX_DIR/share:/usr/share
-export XDG_CONFIG_DIRS = $OPENBOX_DIR/etc/xdg:/etc/xdg
-$OPENBOX_DIR/bin/openbox --session & PID=$!
+export OPENBOX_DIR=/opt/scns_apps_platform/thirdparty/OpenBox
+export VIRTUALGL_DIR=/opt/scns_apps_platform/thirdparty/VirtualGL
+export XDG_DATA_DIRS=$OPENBOX_DIR/share:/usr/share
+export XDG_CONFIG_DIRS=$OPENBOX_DIR/etc/xdg:/etc/xdg
+$OPENBOX_DIR/bin/openbox-session & PID=$!
 $VIRTUALGL_DIR/bin/vglrun /opt/scns_apps_platform/thirdparty/VirtualGL/bin/glxspheres64
 kill $PID
 EOF
-      chmod +x /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh
+          chmod +x /opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh
       fi
+
+    _check_and_create_user "caep_user1" || return 1
+    _switch_to_user "caep_user1" || return 1
       
       local api_payload='{"username":"caep_user1","display_number":1,"custom_script_path":"/opt/scns_apps_platform/thirdparty/app_start_scripts/run_glx.sh"}'
 
@@ -853,10 +856,6 @@ EOF
       fi
   }
 
-
-# ------------------------------------------------------------------------------
-# 检测主函数
-# ------------------------------------------------------------------------------
   deep_check_vnc_session() {
       logInfo "开始调用 VNC 服务"
 
@@ -869,9 +868,6 @@ EOF
       若存在pid 执行 kill pid 杀死进程"
   }
 
-# ------------------------------------------------------------------------------
-# 主逻辑
-# ------------------------------------------------------------------------------
   logInfo "执行模式: VNC 会话服务深度检测"
   deep_check_vnc_session
   return $?
@@ -1095,7 +1091,7 @@ main() {
         return 0
     fi
 
-    print_stage_header "第3项：VNC服务后端接口检查"
+    print_stage_header "第3项：VNC后端接口检查"
     run_vnc_check
     rc_vnc=$?
 
@@ -1120,15 +1116,15 @@ main() {
     fi
 
     if [[ $rc_healthy -eq 0 ]]; then
-        log_ok "进程及服务状态检查：成功"
+        log_ok "进程服务状态检查：成功"
     else
-        log_fail "进程及服务状态检查：失败，退出码 $rc_healthy"
+        log_fail "进程服务状态检查：失败，退出码 $rc_healthy"
     fi
 
     if [[ $rc_vnc -eq 0 ]]; then
-        log_ok "VNC服务后端接口检查：成功"
+        log_ok "后端VNC接口检查：成功"
     else
-        log_fail "VNC服务后端接口检查：失败，退出码 $rc_vnc"
+        log_fail "后端VNC接口检查：失败，退出码 $rc_vnc"
     fi
 
     if [[ $ran_vnc_deep -eq 1 ]]; then
