@@ -75,6 +75,11 @@ export VPN_CONFIG_FILE_PATH=$Thirdparty_DIR/user-passwd
 # node user management script
 export USER_MANAGE_SCRIPT_PORT=9001
 
+# websokify
+export WEBSOKIFY_PORT=6080
+export NoVNC_DIR=$Thirdparty_DIR/noVNC
+export NOVNC_TOKEN_DIR=$Thirdparty_DIR/noVNC/token
+
 # output .env file
 > ./.env
 echo "REDIS_HOST=$REDIS_HOST" >> ./.env
@@ -88,5 +93,8 @@ echo "START_APP_SCRIPTS_DIR=$START_APP_SCRIPTS_DIR" >> ./.env
 echo "VNC_SESSION_MANAGER_URL=$VNC_SESSION_MANAGER_URL" >> ./.env
 echo "USER_MANAGEMENT_HOST=$USER_MANAGEMENT_HOST" >> ./.env
 echo "NOVNC_DATA_DIR=$NOVNC_DATA_DIR" >> ./.env
+echo "NoVNC_DIR=$NoVNC_DIR" >> ./.env
+echo "NOVNC_TOKEN_DIR=$NOVNC_TOKEN_DIR" >> ./.env
 echo "OPENBOX_DIR=$OPENBOX_DIR" >> ./.env
 echo "VIRTUALGL_DIR=$VIRTUALGL_DIR" >> ./.env
+echo "WEBSOKIFY_PORT=$WEBSOKIFY_PORT" >> ./.env

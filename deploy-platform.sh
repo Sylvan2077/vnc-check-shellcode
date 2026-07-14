@@ -693,6 +693,53 @@ stopFileBrowser() {
     fi
 }
 
+########### websokify #################
+statusWebsokify() {
+    local started=$(statusProgram $WEBSOKIFY_PORT)
+    if [[ "$started" == "0" ]]; then
+        logSuccess "Service [Websokify] started."
+    else
+        logWarn "Service [Websokify] not started."
+    fi
+}
+
+startWebsokify() {
+    local started=$(statusProgram $WEBSOKIFY_PORT)
+    if [[ "$started" == "1" ]]; then
+        logInfo "Service [Websokify] not started, now start it."
+        pushd "$SCRIPT_DIR" >/dev/null
+        bash start_websokify.sh $WEBSOKIFY_PORT $NoVNC_DIR $NOVNC_TOKEN_DIR
+        popd >/dev/null
+        sleep 1s
+        local started=$(statusProgram $WEBSOKIFY_PORT)
+        if [[ "$started" == "1" ]]; then
+            logError "Service [Websokify] failed."
+        else
+            logSuccess "Service [Websokify] is started successfully."
+        fi
+    else
+        logSuccess "Service [Websokify] is already started"
+    fi
+}
+
+stopWebsokify() {
+    local started=$(statusProgram $WEBSOKIFY_PORT)
+    if [[ "$started" == "0" ]]; then
+        logInfo "Now kill Websokify"
+        local wspid=$(ps -ef | grep -v grep | grep -e "\b$WEBSOKIFY_PORT\b" | awk '{print $2}')
+        kill $wspid
+        sleep 1s
+        local started=$(statusProgram $WEBSOKIFY_PORT)
+        if [[ "$started" == "1" ]]; then
+            logInfo "Service [Websokify] stoped."
+        else
+            logWarn "Service [Websokify] not stoped."
+        fi
+    else
+        logWarn "Websokify not running..."
+    fi
+}
+
 ########### extra checks #################
 extraAction() {
     # check turbovnc log dirs
@@ -769,6 +816,9 @@ serverStart() {
     # check filebrowser
     startFileBrowser
 
+    # check websokify
+    startWebsokify
+
     # extra actions
     extraAction
 }
@@ -782,6 +832,7 @@ serverStop() {
     stopUserMgt
     stopNodeUserMgt
     stopFileBrowser
+    stopWebsokify
 }
 
 removeContainer() {
@@ -868,6 +919,7 @@ serverCheck() {
     statusUserMgt
     statusNodeUserMgt
     statusFileBrowser
+    statusWebsokify
 }
 
 help() {
@@ -887,7 +939,7 @@ Available Commands:
             status  | ss : check server status
 
         subcommand:
-            pg redis nginx backend vncmgt usermgt nodeusermgt filebrowser
+            pg redis nginx backend vncmgt usermgt nodeusermgt filebrowser websokify
 
             options:
                 start   | s  : start server
@@ -1080,6 +1132,24 @@ main() {
                         ;;
                     status | ss)
                         statusFileBrowser
+                        ;;
+                    esac
+                    ;;
+                websokify | ws)
+                    shift
+                    case $1 in
+                    start | s)
+                        startWebsokify
+                        ;;
+                    stop | t)
+                        stopWebsokify
+                        ;;
+                    restart | r)
+                        stopWebsokify
+                        startWebsokify
+                        ;;
+                    status | ss)
+                        statusWebsokify
                         ;;
                     esac
                     ;;
