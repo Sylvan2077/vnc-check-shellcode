@@ -609,7 +609,9 @@ startNodeUserMgt() {
     if [[ "$started" == "1" ]]; then
         logInfo "Service [NodeUserMgt] not started, now start it."
         pushd "$SCRIPT_DIR" >/dev/null
-        python3 user_manage.py $USER_MANAGE_SCRIPT_PORT >/dev/null 2>&1 &
+        python3 user_manage.py $USER_MANAGE_SCRIPT_PORT &>"$SCRIPT_DIR/user_manage.log" &
+        # 记录进程ID到文件，便于管理
+        echo $! > "$SCRIPT_DIR/user_manage.pid"
         popd >/dev/null
         sleep 1s
         local started=$(statusProgram $USER_MANAGE_SCRIPT_PORT)
@@ -708,7 +710,7 @@ startWebsokify() {
     if [[ "$started" == "1" ]]; then
         logInfo "Service [Websokify] not started, now start it."
         pushd "$SCRIPT_DIR" >/dev/null
-        bash start_websokify.sh $WEBSOKIFY_PORT $NoVNC_DIR $NOVNC_TOKEN_DIR
+        bash start_websokify.sh $WEBSOKIFY_PORT $NoVNC_DIR $NOVNC_TOKEN_DIR >"$SCRIPT_DIR/websokify.log" 2>&1
         popd >/dev/null
         sleep 1s
         local started=$(statusProgram $WEBSOKIFY_PORT)
