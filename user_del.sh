@@ -17,14 +17,14 @@ if ! id "$username" &>/dev/null; then
     exit 1
 fi
 
+# 强制终止用户进程
+pkill -u "${username}" &>/dev/null
+
 # 检查用户是否有进程在运行
 if pgrep -u "${username}" &>/dev/null; then
     echo "{\"success\": false, \"message\": \"该用户下存在桌面未关闭\"}"
     exit 1
 fi
-
-# 强制终止用户进程
-pkill -u "${username}" &>/dev/null
 
 # 删除用户及其家目录
 if ! userdel -r "${username}"; then

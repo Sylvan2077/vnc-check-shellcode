@@ -14,7 +14,10 @@ def execute_script(script_path, *args):
     try:
         result = subprocess.run(
             ['bash', script_path] + list(args),
-            capture_output=True, text=True
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            encoding="utf-8"
         )
         print(f"[DEBUG] 脚本执行完成，返回码: {result.returncode}")
         print(f"[DEBUG] 脚本输出: {result.stdout.strip()}")

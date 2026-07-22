@@ -398,6 +398,21 @@ startBackend() {
             --env-file $SCRIPT_DIR/.env \
             --add-host="host.docker.internal:host-gateway" \
             $BACKEND_IMG
+        $DOCKER_CMD run -d \
+            --name celery-worker \
+            --network host \
+            -v /opt:/opt \
+            --env-file $SCRIPT_DIR/.env \
+            --restart unless-stopped \
+            $BACKEND_IMG \
+            celery -A apps.novncdb worker -l info
+        $DOCKER_CMD run -d \
+            --name celery-beat \
+            --network host \
+            --env-file $SCRIPT_DIR/.env \
+            --restart unless-stopped \
+            $BACKEND_IMG \
+            celery -A apps.novncdb beat -l info
         # check start status
         local status=$(statusContainer $BACKEND_NAME)
         if [[ "$status" == "0" ]]; then
@@ -409,6 +424,8 @@ startBackend() {
     else
         logWarn "$BACKEND_NAME is stoped, now start it."
         $DOCKER_CMD start $BACKEND_NAME >/dev/null
+        $DOCKER_CMD start celery-worker >/dev/null
+        $DOCKER_CMD start celery-beat >/dev/null
         local status=$(statusContainer $BACKEND_NAME)
         if [[ "$status" == "0" ]]; then
             logSuccess "$BACKEND_NAME has been started!"
@@ -428,6 +445,28 @@ stopBackend() {
         logWarn "$BACKEND_NAME not started."
     else
         logSuccess "Stoped $BACKEND_NAME"
+    fi
+        logInfo "Now stop $BACKEND_NAME"
+    
+    $DOCKER_CMD stop celery-worker >/dev/null
+    local status=$(statusContainer celery-worker)
+    if [[ "$status" == "0" ]]; then
+        logWarn "Stop celery-worker failed, still up."
+    elif [[ "$status" == "1" ]]; then
+        logWarn "celery-worker not started."
+    else
+        logSuccess "Stoped $BACKEND_NAME"
+    fi
+        logInfo "Now stop $BACKEND_NAME"
+
+    $DOCKER_CMD stop celery-beat >/dev/null
+    local status=$(statusContainer celery-beat)
+    if [[ "$status" == "0" ]]; then
+        logWarn "Stop celery-beat failed, still up."
+    elif [[ "$status" == "1" ]]; then
+        logWarn "celery-beat not started."
+    else
+        logSuccess "Stoped celery-beat"
     fi
 }
 
@@ -609,8 +648,7 @@ startNodeUserMgt() {
     if [[ "$started" == "1" ]]; then
         logInfo "Service [NodeUserMgt] not started, now start it."
         pushd "$SCRIPT_DIR" >/dev/null
-        python3 user_manage.py $USER_MANAGE_SCRIPT_PORT &>"$SCRIPT_DIR/user_manage.log" &
-        # 记录进程ID到文件，便于管理
+        python3 user_manage.py $USER_MANAGE_SCRIPT_PORT &> "$SCRIPT_DIR/user_manage.log" &
         echo $! > "$SCRIPT_DIR/user_manage.pid"
         popd >/dev/null
         sleep 1s
@@ -695,50 +733,50 @@ stopFileBrowser() {
     fi
 }
 
-########### websokify #################
-statusWebsokify() {
+########### Websockify #################
+statusWebsockify() {
     local started=$(statusProgram $WEBSOKIFY_PORT)
     if [[ "$started" == "0" ]]; then
-        logSuccess "Service [Websokify] started."
+        logSuccess "Service [Websockify] started."
     else
-        logWarn "Service [Websokify] not started."
+        logWarn "Service [Websockify] not started."
     fi
 }
 
-startWebsokify() {
+startWebsockify() {
     local started=$(statusProgram $WEBSOKIFY_PORT)
     if [[ "$started" == "1" ]]; then
-        logInfo "Service [Websokify] not started, now start it."
+        logInfo "Service [Websockify] not started, now start it."
         pushd "$SCRIPT_DIR" >/dev/null
-        bash start_websokify.sh $WEBSOKIFY_PORT $NoVNC_DIR $NOVNC_TOKEN_DIR >"$SCRIPT_DIR/websokify.log" 2>&1
+        bash start_Websockify.sh $WEBSOKIFY_PORT $NoVNC_DIR $NOVNC_TOKEN_DIR > "$SCRIPT_DIR/websockify.log" 2>&1
         popd >/dev/null
         sleep 1s
         local started=$(statusProgram $WEBSOKIFY_PORT)
         if [[ "$started" == "1" ]]; then
-            logError "Service [Websokify] failed."
+            logError "Service [Websockify] failed."
         else
-            logSuccess "Service [Websokify] is started successfully."
+            logSuccess "Service [Websockify] is started successfully."
         fi
     else
-        logSuccess "Service [Websokify] is already started"
+        logSuccess "Service [Websockify] is already started"
     fi
 }
 
-stopWebsokify() {
+stopWebsockify() {
     local started=$(statusProgram $WEBSOKIFY_PORT)
     if [[ "$started" == "0" ]]; then
-        logInfo "Now kill Websokify"
+        logInfo "Now kill Websockify"
         local wspid=$(ps -ef | grep -v grep | grep -e "\b$WEBSOKIFY_PORT\b" | awk '{print $2}')
         kill $wspid
         sleep 1s
         local started=$(statusProgram $WEBSOKIFY_PORT)
         if [[ "$started" == "1" ]]; then
-            logInfo "Service [Websokify] stoped."
+            logInfo "Service [Websockify] stoped."
         else
-            logWarn "Service [Websokify] not stoped."
+            logWarn "Service [Websockify] not stoped."
         fi
     else
-        logWarn "Websokify not running..."
+        logWarn "Websockify not running..."
     fi
 }
 
@@ -936,7 +974,7 @@ Available Commands:
             status  | ss : check server status
 
         subcommand:
-            pg redis nginx backend vncmgt usermgt nodeusermgt filebrowser websokify
+            pg redis nginx backend vncmgt usermgt nodeusermgt filebrowser Websockify
 
             options:
                 start   | s  : start server
@@ -1132,21 +1170,21 @@ main() {
                         ;;
                     esac
                     ;;
-                websokify | ws)
+                Websockify | ws)
                     shift
                     case $1 in
                     start | s)
-                        startWebsokify
+                        startWebsockify
                         ;;
                     stop | t)
-                        stopWebsokify
+                        stopWebsockify
                         ;;
                     restart | r)
-                        stopWebsokify
-                        startWebsokify
+                        stopWebsockify
+                        startWebsockify
                         ;;
                     status | ss)
-                        statusWebsokify
+                        statusWebsockify
                         ;;
                     esac
                     ;;

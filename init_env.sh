@@ -12,7 +12,7 @@ export NGX_NAME="${DOCKER_PREFIX}_nginx"
 export BACKEND_NAME="${DOCKER_PREFIX}_backend"
 
 # backend
-export BACKEND_IMG=scns-app-db:0.1.1
+export BACKEND_IMG=scns-app-db:0.2.0
 export VNCMANAGEMENT_PROTOCAL=http
 export VNCMANAGEMENT_HOST=0.0.0.0
 export VNCMANAGEMENT_PORT=10086
@@ -78,7 +78,11 @@ export USER_MANAGE_SCRIPT_PORT=9001
 # websokify
 export WEBSOKIFY_PORT=6080
 export NoVNC_DIR=$Thirdparty_DIR/noVNC
-export NOVNC_TOKEN_DIR=$Thirdparty_DIR/noVNC/token
+export NOVNC_TOKEN_DIR=$Thirdparty_DIR/noVNC
+
+# celery
+export CELERY_BROKER_URL=redis://0.0.0.0:55555/0
+export CELERY_RESULT_BACKEND=redis://0.0.0.0:55555/1
 
 # output .env file
 > ./.env
@@ -98,3 +102,5 @@ echo "NOVNC_TOKEN_DIR=$NOVNC_TOKEN_DIR" >> ./.env
 echo "OPENBOX_DIR=$OPENBOX_DIR" >> ./.env
 echo "VIRTUALGL_DIR=$VIRTUALGL_DIR" >> ./.env
 echo "WEBSOKIFY_PORT=$WEBSOKIFY_PORT" >> ./.env
+echo "CELERY_BROKER_URL=$CELERY_BROKER_URL" >> ./.env
+echo "CELERY_RESULT_BACKEND=$CELERY_RESULT_BACKEND" >> ./.env
