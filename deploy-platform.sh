@@ -930,7 +930,7 @@ main() {
         MODE="FRESH"
         logWarn "No parameters with this script, MODE=FRESH will clear database, continue ? [y/N]"
         if confirmDefaultNo; then
-            setupStartupScript
+            dependenciesInstall
             serverStart
         fi
     else
