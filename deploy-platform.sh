@@ -806,13 +806,29 @@ serverRestart() {
 }
 
 setupStartupScript() {
-    cat <<EOF >/etc/init.d/startup-platform.sh
-#!/bin/bash
-bash $SCRIPT_DIR/deploy-platform.sh s s
+    local unit=/etc/systemd/system/scns-platform.service
+    cat <<EOF >$unit
+[Unit]
+Description=SCNS Platform Service
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=forking
+RemainAfterExit=yes
+WorkingDirectory=$SCRIPT_DIR
+ExecStart=/bin/bash $SCRIPT_DIR/deploy-platform.sh server start
+ExecStop=/bin/bash $SCRIPT_DIR/deploy-platform.sh server stop
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
 EOF
-    chmod +x /etc/init.d/startup-platform.sh
-    chkconfig startup-platform.sh on
-    chkconfig --list startup-platform.sh
+    systemctl daemon-reload
+    systemctl enable scns-platform.service
+    systemctl enable docker.service
+    systemctl enable containerd.service
+    logSuccess "scns-platform service enabled, managed via systemctl."
 }
 
 dependenciesInstall() {
