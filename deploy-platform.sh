@@ -21,6 +21,20 @@ preCheck() {
     checkForRoot
     checkFirewalld
     checkSelinuxDisabled
+    # 校验关键变量已加载（init_env.sh 必须提供这些值）
+    local required_vars=(
+        PG_NAME RDS_NAME NGX_NAME BACKEND_NAME
+        VNC_SESSION_MANAGER_PORT USER_MANAGEMENT_PORT USER_MANAGE_SCRIPT_PORT
+    )
+    local missing=""
+    for v in "${required_vars[@]}"; do
+        if [[ -z "${!v}" ]]; then
+            missing="$missing $v"
+        fi
+    done
+    if [[ -n "$missing" ]]; then
+        bail "Missing required variables:$missing. Check init_env.sh is loaded correctly."
+    fi
 }
 
 ########### Docker #################
@@ -160,6 +174,10 @@ Install_Docker() {
 statusContainer() {
     # status: 0 for started, 1 for not started, 2 for down
     serviceName=$1
+    if [[ -z "$serviceName" ]]; then
+        echo 1
+        return
+    fi
     local name_status=$(docker ps -a --format "{{.Names}} | {{.Status}}" | grep -e "\b${serviceName}\b")
     local existing_status=$(echo $name_status | grep "|" -c)
     local up_status=$(echo $name_status | grep "Up" -c)
@@ -167,17 +185,21 @@ statusContainer() {
 
     if [[ "$up_status" == "1" ]]; then
         echo 0
+        return
     fi
 
     # 如果容器没有被启动，则启动容器
     if [[ "$existing_status" == "0" ]]; then
         echo 1
+        return
     fi
 
     # 如果已启动但是 stop 状态，则用 docker start 启动。
     if [[ "$down_status" == 1 ]]; then
         echo 2
+        return
     fi
+    echo 1
 }
 
 statusPG() {
@@ -484,17 +506,61 @@ installBackendDependency() {
 
 statusProgram() {
     # $1 for grep target, 0 for started, 1 for not started
-    local started=$(ps -ef | grep -v grep | grep -e "\b$1\b" -c)
-    if [[ "$started" == "0" ]]; then
+    if [[ -z "$1" ]]; then
+        echo 1
+        return
+    fi
+    local started=$(pgrep -f "$1" -c 2>/dev/null)
+    if [[ "$started" == "0" ]] || [[ -z "$started" ]]; then
         echo 1
     else
         echo 0
     fi
 }
 
+# 安全地杀掉匹配某个命令行模式的进程
+# $1: 匹配模式（用 pgrep -f 匹配命令行）
+# 返回: 0=成功, 1=未找到
+safeKillByPattern() {
+    local pattern="$1"
+    if [[ -z "$pattern" ]]; then
+        return 1
+    fi
+    local pids=$(pgrep -f "$pattern" 2>/dev/null)
+    if [[ -z "$pids" ]]; then
+        return 1
+    fi
+    # 过滤掉当前脚本自身进程
+    local self_pid=$$
+    local filtered=""
+    for p in $pids; do
+        if [[ "$p" != "$self_pid" ]] && [[ "$p" != "1" ]]; then
+            filtered="$filtered $p"
+        fi
+    done
+    if [[ -z "$filtered" ]]; then
+        return 1
+    fi
+    # 强制终止
+    kill $filtered 2>/dev/null
+    sleep 1
+    # 检查是否还存活
+    local remaining=""
+    for p in $filtered; do
+        if kill -0 $p 2>/dev/null; then
+            remaining="$remaining $p"
+        fi
+    done
+    if [[ -n "$remaining" ]]; then
+        kill -9 $remaining 2>/dev/null
+        sleep 1
+    fi
+    return 0
+}
+
 statusVNCMgt() {
     # 1 for not started, 0 for started
-    local started=$(statusProgram $VNC_SESSION_MANAGER_PORT)
+    local started=$(statusProgram "uvicorn.*--port ${VNC_SESSION_MANAGER_PORT}")
     if [[ "$started" == "0" ]]; then
         logSuccess "Service [VNCMgt] started."
     else
@@ -503,7 +569,7 @@ statusVNCMgt() {
 }
 
 startVNCMgt() {
-    local started=$(statusProgram $VNC_SESSION_MANAGER_PORT)
+    local started=$(statusProgram "uvicorn.*--port ${VNC_SESSION_MANAGER_PORT}")
     if [[ "$started" == "1" ]]; then
         logInfo "Service [VNCMgt] not started, now start it."
         source $PROJECT_DIR/web-server/py310-env/bin/activate
@@ -513,7 +579,7 @@ startVNCMgt() {
         uvicorn --host 0.0.0.0 --port $VNC_SESSION_MANAGER_PORT --reload main:app >/dev/null 2>&1 &
         cd $SCRIPT_DIR
         # check again status
-        local started=$(statusProgram $VNC_SESSION_MANAGER_PORT)
+        local started=$(statusProgram "uvicorn.*--port ${VNC_SESSION_MANAGER_PORT}")
 
         if [[ "$started" == "1" ]]; then
             logError "Service [VNCMgt] failed."
@@ -526,14 +592,11 @@ startVNCMgt() {
 }
 
 stopVNCMgt() {
-    local started=$(statusProgram $VNC_SESSION_MANAGER_PORT)
+    local started=$(statusProgram "uvicorn.*--port ${VNC_SESSION_MANAGER_PORT}")
     if [[ "$started" == "0" ]]; then
-        logSuccess "Now kill VNCMgt"
-        local vncpid=$(ps -ef | grep -v grep | grep -e "\b$VNC_SESSION_MANAGER_PORT\b" | awk '{print $2}')
-        kill $vncpid
-        sleep 1s
-        # check again status
-        local started=$(statusProgram $VNC_SESSION_MANAGER_PORT)
+        logSuccess "Now stop VNCMgt"
+        safeKillByPattern "uvicorn.*--port ${VNC_SESSION_MANAGER_PORT}"
+        local started=$(statusProgram "uvicorn.*--port ${VNC_SESSION_MANAGER_PORT}")
         if [[ "$started" == "1" ]]; then
             logInfo "Service [VNCMgt] stoped."
         else
@@ -546,7 +609,7 @@ stopVNCMgt() {
 
 statusUserMgt() {
     # 1 for not started, 0 for started
-    local started=$(statusProgram $USER_MANAGEMENT_PORT)
+    local started=$(statusProgram "uvicorn.*--port ${USER_MANAGEMENT_PORT}")
     if [[ "$started" == "0" ]]; then
         logSuccess "Service [UserMgt] started."
     else
@@ -555,7 +618,7 @@ statusUserMgt() {
 }
 
 startUserMgt() {
-    local started=$(statusProgram $USER_MANAGEMENT_PORT)
+    local started=$(statusProgram "uvicorn.*--port ${USER_MANAGEMENT_PORT}")
     if [[ "$started" == "1" ]]; then
         logInfo "Service [UserMgt] not started, now start it."
         source $PROJECT_DIR/web-server/py310-env/bin/activate
@@ -565,7 +628,7 @@ startUserMgt() {
         uvicorn --host 0.0.0.0 --port $USER_MANAGEMENT_PORT --reload main:app >/dev/null 2>&1 &
         cd $SCRIPT_DIR
         # check again status
-        local started=$(statusProgram $USER_MANAGEMENT_PORT)
+        local started=$(statusProgram "uvicorn.*--port ${USER_MANAGEMENT_PORT}")
         if [[ "$started" == "1" ]]; then
             logError "Service [UserMgt] failed."
         else
@@ -577,14 +640,11 @@ startUserMgt() {
 }
 
 stopUserMgt() {
-    local started=$(statusProgram $USER_MANAGEMENT_PORT)
+    local started=$(statusProgram "uvicorn.*--port ${USER_MANAGEMENT_PORT}")
     if [[ "$started" == "0" ]]; then
-        logSuccess "Now kill UserMgt"
-        local userpid=$(ps -ef | grep -v grep | grep -e "\b$USER_MANAGEMENT_PORT\b" | awk '{print $2}')
-        kill $userpid
-        sleep 1s
-        # check again status
-        local started=$(statusProgram $USER_MANAGEMENT_PORT)
+        logSuccess "Now stop UserMgt"
+        safeKillByPattern "uvicorn.*--port ${USER_MANAGEMENT_PORT}"
+        local started=$(statusProgram "uvicorn.*--port ${USER_MANAGEMENT_PORT}")
         if [[ "$started" == "1" ]]; then
             logInfo "Service [UserMgt] stoped."
         else
@@ -596,7 +656,7 @@ stopUserMgt() {
 }
 
 statusNodeUserMgt() {
-    local started=$(statusProgram $USER_MANAGE_SCRIPT_PORT)
+    local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
     if [[ "$started" == "0" ]]; then
         logSuccess "Service [NodeUserMgt] started."
     else
@@ -605,14 +665,14 @@ statusNodeUserMgt() {
 }
 
 startNodeUserMgt() {
-    local started=$(statusProgram $USER_MANAGE_SCRIPT_PORT)
+    local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
     if [[ "$started" == "1" ]]; then
         logInfo "Service [NodeUserMgt] not started, now start it."
         pushd "$SCRIPT_DIR" >/dev/null
         python3 user_manage.py $USER_MANAGE_SCRIPT_PORT >/dev/null 2>&1 &
         popd >/dev/null
         sleep 1s
-        local started=$(statusProgram $USER_MANAGE_SCRIPT_PORT)
+        local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
         if [[ "$started" == "1" ]]; then
             logError "Service [NodeUserMgt] failed."
         else
@@ -624,13 +684,11 @@ startNodeUserMgt() {
 }
 
 stopNodeUserMgt() {
-    local started=$(statusProgram $USER_MANAGE_SCRIPT_PORT)
+    local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
     if [[ "$started" == "0" ]]; then
-        logInfo "Now kill NodeUserMgt"
-        local nodepid=$(ps -ef | grep -v grep | grep -e "\b$USER_MANAGE_SCRIPT_PORT\b" | awk '{print $2}')
-        kill $nodepid
-        sleep 1s
-        local started=$(statusProgram $USER_MANAGE_SCRIPT_PORT)
+        logInfo "Now stop NodeUserMgt"
+        safeKillByPattern "user_manage.py ${USER_MANAGE_SCRIPT_PORT}"
+        local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
         if [[ "$started" == "1" ]]; then
             logInfo "Service [NodeUserMgt] stoped."
         else
@@ -644,7 +702,7 @@ stopNodeUserMgt() {
 ########### file browser #################
 statusFileBrowser() {
     # 1 for not started, 0 for started
-    local started=$(statusProgram filebrowser)
+    local started=$(statusProgram "linux-amd64-filebrowser/filebrowser")
     if [[ "$started" == "0" ]]; then
         logSuccess "Service [FileBrowser] started."
     else
@@ -653,7 +711,7 @@ statusFileBrowser() {
 }
 
 startFileBrowser() {
-    local started=$(statusProgram filebrowser)
+    local started=$(statusProgram "linux-amd64-filebrowser/filebrowser")
     if [[ "$started" == "1" ]]; then
         logInfo "Service [FileBrowser] not started, now start it."
         if [[ ! -d "$FILE_BROWSER_DATA_DIR" ]]; then
@@ -663,7 +721,7 @@ startFileBrowser() {
         ./linux-amd64-filebrowser/filebrowser -r $FILE_BROWSER_DATA_DIR -p $FILEBROWSER_PORT -a $FILEBROWSER_HOST >/dev/null 2>&1 &
         popd >/dev/null
         # check again status
-        local started=$(statusProgram filebrowser)
+        local started=$(statusProgram "linux-amd64-filebrowser/filebrowser")
         if [[ "$started" == "1" ]]; then
             logError "Service [FileBrowser] failed."
         else
@@ -675,14 +733,11 @@ startFileBrowser() {
 }
 
 stopFileBrowser() {
-    local started=$(statusProgram filebrowser)
+    local started=$(statusProgram "linux-amd64-filebrowser/filebrowser")
     if [[ "$started" == "0" ]]; then
-        logSuccess "Now kill FileBrowser"
-        local fbpid=$(ps -ef | grep -v grep | grep -e "\bfilebrowser\b" | awk '{print $2}')
-        kill $fbpid
-        sleep 1s
-        # check again status
-        local started=$(statusProgram filebrowser)
+        logSuccess "Now stop FileBrowser"
+        safeKillByPattern "linux-amd64-filebrowser/filebrowser"
+        local started=$(statusProgram "linux-amd64-filebrowser/filebrowser")
         if [[ "$started" == "1" ]]; then
             logInfo "Service [FileBrowser] stoped."
         else
