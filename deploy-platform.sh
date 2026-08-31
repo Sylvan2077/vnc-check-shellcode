@@ -48,7 +48,11 @@ installDockerFromTarball() {
     pushd $PROJECT_DIR/docker >/dev/null
     tar -xf pkgs/docker-20.10.15.tar.gz
     mv docker/bin/* /usr/bin/
-    mv docker/docker.service /etc/systemd/system
+    for svc in docker.service docker.socket containerd.service containerd.sock; do
+        if [[ -f "docker/$svc" ]]; then
+            mv "docker/$svc" /etc/systemd/system/
+        fi
+    done
     rm -rf docker
     popd >/dev/null
 }
@@ -833,8 +837,10 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable scns-platform.service
-    systemctl enable docker.service
-    systemctl enable containerd.service
+    systemctl enable docker.service 2>/dev/null || logWarn "Failed to enable docker.service, skipping."
+    if [[ -f /etc/systemd/system/containerd.service ]]; then
+        systemctl enable containerd.service 2>/dev/null || logWarn "Failed to enable containerd.service, skipping."
+    fi
     logSuccess "scns-platform service enabled, managed via systemctl."
 }
 
