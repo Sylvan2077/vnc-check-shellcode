@@ -24,7 +24,7 @@ preCheck() {
     # 校验关键变量已加载（init_env.sh 必须提供这些值）
     local required_vars=(
         PG_NAME RDS_NAME NGX_NAME BACKEND_NAME
-        VNC_SESSION_MANAGER_PORT USER_MANAGEMENT_PORT USER_MANAGE_SCRIPT_PORT
+        VNC_SESSION_MANAGER_PORT USER_MANAGEMENT_PORT
     )
     local missing=""
     for v in "${required_vars[@]}"; do
@@ -655,50 +655,6 @@ stopUserMgt() {
     fi
 }
 
-statusNodeUserMgt() {
-    local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
-    if [[ "$started" == "0" ]]; then
-        logSuccess "Service [NodeUserMgt] started."
-    else
-        logWarn "Service [NodeUserMgt] not started."
-    fi
-}
-
-startNodeUserMgt() {
-    local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
-    if [[ "$started" == "1" ]]; then
-        logInfo "Service [NodeUserMgt] not started, now start it."
-        pushd "$SCRIPT_DIR" >/dev/null
-        python3 user_manage.py $USER_MANAGE_SCRIPT_PORT >/dev/null 2>&1 &
-        popd >/dev/null
-        sleep 1s
-        local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
-        if [[ "$started" == "1" ]]; then
-            logError "Service [NodeUserMgt] failed."
-        else
-            logSuccess "Service [NodeUserMgt] is started successfully."
-        fi
-    else
-        logSuccess "Service [NodeUserMgt] is already started"
-    fi
-}
-
-stopNodeUserMgt() {
-    local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
-    if [[ "$started" == "0" ]]; then
-        logInfo "Now stop NodeUserMgt"
-        safeKillByPattern "user_manage.py ${USER_MANAGE_SCRIPT_PORT}"
-        local started=$(statusProgram "user_manage.py ${USER_MANAGE_SCRIPT_PORT}")
-        if [[ "$started" == "1" ]]; then
-            logInfo "Service [NodeUserMgt] stoped."
-        else
-            logWarn "Service [NodeUserMgt] not stoped."
-        fi
-    else
-        logWarn "NodeUserMgt not running..."
-    fi
-}
-
 ########### file browser #################
 statusFileBrowser() {
     # 1 for not started, 0 for started
@@ -818,9 +774,6 @@ serverStart() {
     startVNCMgt
     startUserMgt
 
-    # check NodeUserMgt service
-    startNodeUserMgt
-
     # check filebrowser
     startFileBrowser
 
@@ -835,7 +788,6 @@ serverStop() {
     stopBackend
     stopVNCMgt
     stopUserMgt
-    stopNodeUserMgt
     stopFileBrowser
 }
 
@@ -937,7 +889,6 @@ serverCheck() {
     statusBackend
     statusVNCMgt
     statusUserMgt
-    statusNodeUserMgt
     statusFileBrowser
 }
 
@@ -958,7 +909,7 @@ Available Commands:
             status  | ss : check server status
 
         subcommand:
-            pg redis nginx backend vncmgt usermgt nodeusermgt filebrowser
+            pg redis nginx backend vncmgt usermgt filebrowser
 
             options:
                 start   | s  : start server
@@ -1116,24 +1067,6 @@ main() {
                         ;;
                     status | ss)
                         statusUserMgt
-                        ;;
-                    esac
-                    ;;
-                nodeusermgt | nodeuser)
-                    shift
-                    case $1 in
-                    start | s)
-                        startNodeUserMgt
-                        ;;
-                    stop | t)
-                        stopNodeUserMgt
-                        ;;
-                    restart | r)
-                        stopNodeUserMgt
-                        startNodeUserMgt
-                        ;;
-                    status | ss)
-                        statusNodeUserMgt
                         ;;
                     esac
                     ;;
