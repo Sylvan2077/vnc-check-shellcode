@@ -856,6 +856,9 @@ serverStart() {
     # check filebrowser
     startFileBrowser
 
+    # check websockify
+    startWebsockify
+
     # extra actions
     extraAction
 }
@@ -869,6 +872,7 @@ serverStop() {
     stopUserMgt
     stopNodeUserMgt
     stopFileBrowser
+    stopWebsockify
 }
 
 removeContainer() {
@@ -955,6 +959,7 @@ serverCheck() {
     statusUserMgt
     statusNodeUserMgt
     statusFileBrowser
+    statusWebsockify
 }
 
 help() {
